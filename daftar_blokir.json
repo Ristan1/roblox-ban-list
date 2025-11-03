@@ -1,5 +1,9 @@
 {
   "banned_users": {
+    "12345": {
+      "username": "TestDariVercel",
+      "banned_at": "2025-11-03T19:10:10.481Z"
+    },
     "987654321": {
       "username": "TestDariReqBin",
       "banned_at": "2025-11-03T15:35:12.759Z"
