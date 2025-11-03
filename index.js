@@ -26,14 +26,14 @@ async function getGithubFile() {
       repo: GITHUB_REPO,
       path: FILE_PATH,
     });
-
+    
     let fileContent = { banned_users: {} };
     if (fileData.content) {
       fileContent = JSON.parse(Buffer.from(fileData.content, 'base64').toString('utf-8'));
     }
     let currentSha = fileData.sha;
     return { fileContent, currentSha };
-
+    
   } catch (e) {
     if (e.status === 404) {
       console.log("File tidak ditemukan, akan membuat baru.");
@@ -48,7 +48,7 @@ async function getGithubFile() {
 // --- FUNGSI UNTUK MENYIMPAN FILE (Dipakai bersama) ---
 async function saveGithubFile(fileContent, currentSha, commitMessage) {
   const newContentBase64 = Buffer.from(JSON.stringify(fileContent, null, 2)).toString('base64');
-
+  
   await octokit.repos.createOrUpdateFileContents({
     owner: GITHUB_OWNER,
     repo: GITHUB_REPO,
@@ -87,7 +87,7 @@ app.post("/ban-player", async (req, res) => {
 
     // Simpan file
     await saveGithubFile(fileContent, currentSha, `[BOT] Menambahkan blokir untuk ${username}`);
-
+    
     console.log("Berhasil memperbarui file (BAN).");
     res.status(200).send({ status: "success", message: "Pemain berhasil diblokir." });
 
@@ -127,7 +127,7 @@ app.post("/unban-player", async (req, res) => {
 
     // Simpan file
     await saveGithubFile(fileContent, currentSha, `[BOT] Menghapus blokir untuk ${username}`);
-
+    
     console.log("Berhasil memperbarui file (UNBAN).");
     res.status(200).send({ status: "success", message: "Pemain berhasil di-unban." });
 
