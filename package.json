@@ -1,0 +1,9 @@
+{
+  "name": "roblox-ban-server-vercel",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.19.2",
+    "@octokit/rest": "^20.1.0"
+  }
+}
