@@ -1,3 +1,8 @@
 {
-  "banned_users": {}
+  "banned_users": {
+    "987654321": {
+      "username": "TestDariReqBin",
+      "banned_at": "2025-11-03T15:30:11.292Z"
+    }
+  }
 }
