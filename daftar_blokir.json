@@ -1,12 +1,12 @@
 {
   "banned_users": {
-    "9485316035": {
-      "username": "Naz_rld",
-      "banned_at": "2025-11-03T19:12:17.956Z"
-    },
     "987654321": {
       "username": "TestDariReqBin",
       "banned_at": "2025-11-03T15:35:12.759Z"
+    },
+    "9485316035": {
+      "username": "Naz_rld",
+      "banned_at": "2025-11-04T04:57:25.184Z"
     },
     "7629408614": {
       "username": "24houreveryday",
