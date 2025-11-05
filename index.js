@@ -19,6 +19,7 @@ const {
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
 // --- FUNGSI UNTUK MENDAPATKAN FILE (Dipakai bersama) ---
+// Fungsi ini mengambil konten file JSON dari GitHub dan mengembalikan isinya
 async function getGithubFile() {
   try {
     const { data: fileData } = await octokit.repos.getContent({
@@ -29,6 +30,7 @@ async function getGithubFile() {
     
     let fileContent = { banned_users: {} };
     if (fileData.content) {
+      // Dekode konten dari base64 ke string, lalu parse sebagai JSON
       fileContent = JSON.parse(Buffer.from(fileData.content, 'base64').toString('utf-8'));
     }
     let currentSha = fileData.sha;
@@ -47,6 +49,7 @@ async function getGithubFile() {
 
 // --- FUNGSI UNTUK MENYIMPAN FILE (Dipakai bersama) ---
 async function saveGithubFile(fileContent, currentSha, commitMessage) {
+  // Ubah objek JSON kembali menjadi string, lalu enkripsi ke base64
   const newContentBase64 = Buffer.from(JSON.stringify(fileContent, null, 2)).toString('base64');
   
   await octokit.repos.createOrUpdateFileContents({
@@ -55,12 +58,12 @@ async function saveGithubFile(fileContent, currentSha, commitMessage) {
     path: FILE_PATH,
     message: commitMessage, 
     content: newContentBase64,
-    sha: currentSha, 
+    sha: currentSha, // Penting untuk mencegah konflik pembaruan
   });
 }
 
 // =======================================================
-// ==          ENDPOINT 1: BAN PLAYER (TETAP SAMA)      ==
+// ==          ENDPOINT 1: BAN PLAYER                   ==
 // =======================================================
 app.post("/ban-player", async (req, res) => {
   // 1. Verifikasi Keamanan
@@ -98,7 +101,7 @@ app.post("/ban-player", async (req, res) => {
 });
 
 // =======================================================
-// ==          ENDPOINT 2: UNBAN PLAYER (BARU)          ==
+// ==          ENDPOINT 2: UNBAN PLAYER                   ==
 // =======================================================
 app.post("/unban-player", async (req, res) => {
   // 1. Verifikasi Keamanan
@@ -137,5 +140,73 @@ app.post("/unban-player", async (req, res) => {
   }
 });
 
+// =======================================================
+// ==          ENDPOINT 3 (BARU): GET BAN LIST          ==
+// =======================================================
+// Endpoint ini memungkinkan Anda mengambil seluruh daftar ban
+app.get("/ban-list", async (req, res) => {
+  // 1. Verifikasi Keamanan (tetap wajib)
+  if (req.header("X-Roblox-Secret") !== ROBLOX_SECRET) {
+    return res.status(401).send({ status: "error", message: "Unauthorized" });
+  }
+  
+  console.log("Menerima permintaan DAFTAR BAN.");
+
+  try {
+    const { fileContent } = await getGithubFile();
+    
+    // Kirimkan objek banned_users sebagai respon JSON
+    // Formatnya adalah: { "12345": { "username": "...", "banned_at": "..." }, ... }
+    res.status(200).send({ 
+      status: "success", 
+      banned_users: fileContent.banned_users || {}
+    });
+
+  } catch (error) {
+    console.error("Kesalahan fatal saat mengambil daftar ban:", error);
+    res.status(500).send({ status: "error", message: "Internal Server Error", detail: error.message });
+  }
+});
+
+// =======================================================
+// ==          ENDPOINT 4 (BARU): CHECK BAN STATUS      ==
+// =======================================================
+// Endpoint ini memungkinkan Anda mengecek apakah user ID tertentu diban
+app.post("/check-ban", async (req, res) => {
+  // 1. Verifikasi Keamanan (tetap wajib)
+  if (req.header("X-Roblox-Secret") !== ROBLOX_SECRET) {
+    return res.status(401).send({ status: "error", message: "Unauthorized" });
+  }
+
+  // 2. Dapatkan Data
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).send({ status: "error", message: "userId hilang" });
+  }
+  
+  console.log(`Menerima permintaan CEK BAN untuk ID: ${userId}`);
+
+  try {
+    const { fileContent } = await getGithubFile();
+    const userIdStr = String(userId);
+    
+    const isBanned = !!fileContent.banned_users[userIdStr];
+    const userData = fileContent.banned_users[userIdStr] || null;
+
+    // Kirimkan status ban dan data pengguna jika diban
+    res.status(200).send({ 
+      status: "success",
+      userId: userIdStr,
+      is_banned: isBanned,
+      user_data: userData 
+    });
+
+  } catch (error) {
+    console.error("Kesalahan fatal saat memeriksa status ban:", error);
+    res.status(500).send({ status: "error", message: "Internal Server Error", detail: error.message });
+  }
+});
+
 // Baris ini memberitahu Vercel cara menjalankan skrip
 module.exports = app;
+
