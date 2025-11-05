@@ -50,6 +50,7 @@ async function getGithubFile() {
 // --- FUNGSI UNTUK MENYIMPAN FILE (Dipakai bersama) ---
 async function saveGithubFile(fileContent, currentSha, commitMessage) {
   // Ubah objek JSON kembali menjadi string, lalu enkripsi ke base64
+  // Menggunakan null, 2 untuk pemformatan JSON yang mudah dibaca
   const newContentBase64 = Buffer.from(JSON.stringify(fileContent, null, 2)).toString('base64');
   
   await octokit.repos.createOrUpdateFileContents({
@@ -72,24 +73,28 @@ app.post("/ban-player", async (req, res) => {
   }
 
   // 2. Dapatkan Data
-  const { userId, username } = req.body;
-  if (!userId || !username) {
-    return res.status(400).send({ status: "error", message: "userId atau username hilang" });
+  // PERUBAHAN: Sekarang mengharapkan 'displayName'
+  const { userId, username, displayName } = req.body; 
+  if (!userId || !username || !displayName) {
+    // PERUBAHAN: Memastikan displayName juga ada
+    return res.status(400).send({ status: "error", message: "userId, username, atau displayName hilang" });
   }
-  console.log(`Menerima permintaan BAN untuk: ${username} (ID: ${userId})`);
+  console.log(`Menerima permintaan BAN untuk: ${username} (ID: ${userId}) / DisplayName: ${displayName}`);
 
   // 3. Proses ke GitHub
   try {
     const { fileContent, currentSha } = await getGithubFile();
 
     // Tambahkan data ban
+    // PERUBAHAN: Tambahkan 'displayName' dan HAPUS 'banned_at'
     fileContent.banned_users[String(userId)] = {
       username: username,
-      banned_at: new Date().toISOString()
+      displayName: displayName // Ditambahkan
+      // 'banned_at' dihapus
     };
 
     // Simpan file
-    await saveGithubFile(fileContent, currentSha, `[BOT] Menambahkan blokir untuk ${username}`);
+    await saveGithubFile(fileContent, currentSha, `[BOT] Menambahkan blokir untuk ${username} (${displayName})`);
     
     console.log("Berhasil memperbarui file (BAN).");
     res.status(200).send({ status: "success", message: "Pemain berhasil diblokir." });
@@ -114,7 +119,8 @@ app.post("/unban-player", async (req, res) => {
   if (!userId) {
     return res.status(400).send({ status: "error", message: "userId hilang" });
   }
-  console.log(`Menerima permintaan UNBAN untuk: ${username} (ID: ${userId})`);
+  // Catatan: 'username' digunakan hanya untuk logging di endpoint ini
+  console.log(`Menerima permintaan UNBAN untuk: ${username || 'N/A'} (ID: ${userId})`);
 
   // 3. Proses ke GitHub
   try {
@@ -122,17 +128,23 @@ app.post("/unban-player", async (req, res) => {
 
     // Hapus data ban
     if (fileContent.banned_users[String(userId)]) {
+      // Ambil username untuk pesan commit
+      const userToUnban = fileContent.banned_users[String(userId)].username;
       delete fileContent.banned_users[String(userId)];
       console.log("UserId ditemukan dan dihapus.");
+
+      // Simpan file dengan pesan commit yang jelas
+      await saveGithubFile(fileContent, currentSha, `[BOT] Menghapus blokir untuk ${userToUnban}`);
     } else {
       console.log("UserId tidak ditemukan di daftar, tidak ada yang dihapus.");
+      
+      // Jika tidak ada perubahan, kita tetap kirim sukses
+      // dan tidak perlu memanggil saveGithubFile untuk menghindari commit kosong
     }
 
-    // Simpan file
-    await saveGithubFile(fileContent, currentSha, `[BOT] Menghapus blokir untuk ${username}`);
     
-    console.log("Berhasil memperbarui file (UNBAN).");
-    res.status(200).send({ status: "success", message: "Pemain berhasil di-unban." });
+    console.log("Berhasil menyelesaikan permintaan UNBAN.");
+    res.status(200).send({ status: "success", message: "Pemain berhasil di-unban (jika sebelumnya diblokir)." });
 
   } catch (error) {
     console.error("Kesalahan fatal saat UNBAN:", error);
@@ -141,7 +153,7 @@ app.post("/unban-player", async (req, res) => {
 });
 
 // =======================================================
-// ==          ENDPOINT 3 (BARU): GET BAN LIST          ==
+// ==          ENDPOINT 3: GET BAN LIST                 ==
 // =======================================================
 // Endpoint ini memungkinkan Anda mengambil seluruh daftar ban
 app.get("/ban-list", async (req, res) => {
@@ -156,7 +168,7 @@ app.get("/ban-list", async (req, res) => {
     const { fileContent } = await getGithubFile();
     
     // Kirimkan objek banned_users sebagai respon JSON
-    // Formatnya adalah: { "12345": { "username": "...", "banned_at": "..." }, ... }
+    // Formatnya sekarang adalah: { "12345": { "username": "...", "displayName": "..." }, ... }
     res.status(200).send({ 
       status: "success", 
       banned_users: fileContent.banned_users || {}
@@ -169,7 +181,7 @@ app.get("/ban-list", async (req, res) => {
 });
 
 // =======================================================
-// ==          ENDPOINT 4 (BARU): CHECK BAN STATUS      ==
+// ==          ENDPOINT 4: CHECK BAN STATUS             ==
 // =======================================================
 // Endpoint ini memungkinkan Anda mengecek apakah user ID tertentu diban
 app.post("/check-ban", async (req, res) => {
@@ -191,6 +203,7 @@ app.post("/check-ban", async (req, res) => {
     const userIdStr = String(userId);
     
     const isBanned = !!fileContent.banned_users[userIdStr];
+    // 'user_data' sekarang hanya berisi username dan displayName
     const userData = fileContent.banned_users[userIdStr] || null;
 
     // Kirimkan status ban dan data pengguna jika diban
@@ -207,6 +220,6 @@ app.post("/check-ban", async (req, res) => {
   }
 });
 
-// Baris ini memberitahu Vercel cara menjalankan skrip
+// Baris ini memberitahu Vercel/lingkungan Node.js cara menjalankan skrip
 module.exports = app;
 
